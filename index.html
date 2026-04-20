@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Task Manager — Liquid Glass</title>
+<style>
+  /* ---------- RESET / BASE ---------- */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  :root {
+    --bg-grad-1: #0b1024;
+    --bg-grad-2: #1a0b2e;
+    --bg-grad-3: #042a3a;
+    --bg-grad-4: #2a0b3a;
+
+    --text: #f5f7ff;
+    --text-dim: rgba(245,247,255,0.72);
+    --text-faint: rgba(245,247,255,0.5);
+
+    --glass-bg: rgba(255,255,255,0.07);
+    --glass-bg-strong: rgba(255,255,255,0.12);
+    --glass-border: rgba(255,255,255,0.18);
+    --glass-border-strong: rgba(255,255,255,0.28);
+
+    --shadow-lg: 0 20px 60px rgba(0,0,0,0.45), 0 6px 20px rgba(0,0,0,0.3);
+    --shadow-inset: inset 0 1px 0 rgba(255,255,255,0.18);
+
+    --accent: #7c9cff;
+    --accent-2: #b388ff;
+    --success: #4ade80;
+    --warning: #fbbf24;
+    --danger: #f87171;
+
+    --radius: 18px;
+    --radius-sm: 12px;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: var(--text);
+    overflow-x: hidden;
+    min-height: 100vh;
+    background: linear-gradient(135deg, var(--bg-grad-1), var(--bg-grad-2), var(--bg-grad-3), var(--bg-grad-4));
+    background-size: 400% 400%;
+    animation: bgMove 22s ease infinite;
+    position: relative;
+  }
+
+  @keyframes bgMove {
+    0%   { background-position: 0% 50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  /* ---------- AMBIENT ORBS ---------- */
+  .orbs { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+  .orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.55;
+    animation: float 18s ease-in-out infinite;
+  }
+  .orb.o1 { width: 480px; height: 480px; background: #5b8bff; top: -120px; left: -100px; }
+  .orb.o2 { width: 420px; height: 420px; background: #b66bff; top: 30%; right: -120px; animation-delay: -4s; }
+  .orb.o3 { width: 380px; height: 380px; background: #16d3c8; bottom: -120px; left: 20%; animation-delay: -8s; }
+  .orb.o4 { width: 300px; height: 300px; background: #ff6bb5; top: 60%; left: 10%; animation-delay: -12s; opacity: 0.4; }
+
+  @keyframes float {
+    0%,100% { transform: translate(0,0) scale(1); }
+    50%     { transform: translate(40px,-30px) scale(1.08); }
+  }
+
+  /* Section ambient color tints */
+  body[data-section="task"] .orb.o1 { background: #5b8bff; }
+  body[data-section="task"] .orb.o2 { background: #b66bff; }
+  body[data-section="school"] .orb.o1 { background: #16d3c8; }
+  body[data-section="school"] .orb.o2 { background: #ffb86b; }
+
+  /* ---------- LAYOUT ---------- */
+  .app {
+    position: relative;
+    z-index: 1;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 28px 24px 80px;
+  }
+
+  /* ---------- HEADER ---------- */
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 16px;
+    padding: 18px 22px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    backdrop-filter: blur(22px) saturate(160%);
+    -webkit-backdrop-filter: blur(22px) saturate(160%);
+    box-shadow: var(--shadow-lg), var(--shadow-inset);
+    margin-bottom: 22px;
+  }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .brand-mark {
+    width: 44px; height: 44px; border-radius: 12px;
+    background: linear-gradient(135deg, #7c9cff, #b388ff);
+    display: grid; place-items: center;
+    box-shadow: 0 8px 22px rgba(124,156,255,0.45), inset 0 1px 0 rgba(255,255,255,0.4);
+    font-size: 22px;
+  }
+  .brand h1 { font-size: 20px; font-weight: 700; letter-spacing: 0.2px; }
+  .brand p { font-size: 12px; color: var(--text-dim); }
+
+  .header-right { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .date-pill {
+    padding: 10px 14px;
+    border-radius: 999px;
+    background: var(--glass-bg-strong);
+    border: 1px solid var(--glass-border);
+    font-size: 13px; color: var(--text-dim);
+    backdrop-filter: blur(12px);
+  }
+  .date-pill strong { color: var(--text); font-weight: 600; }
+
+  /* Section Switcher */
+  .section-switch {
+    display: inline-flex; padding: 6px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 999px;
+    backdrop-filter: blur(14px);
+  }
+  .section-switch button {
+    border: none; background: transparent; color: var(--text-dim);
+    padding: 9px 18px; border-radius: 999px; cursor: pointer;
+    font-weight: 600; font-size: 14px;
+    transition: all 0.3s ease;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .section-switch button.active {
+    background: linear-gradient(135deg, rgba(255,255,255,0.25), rgba(255,255,255,0.1));
+    color: var(--text);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.3);
+  }
+
+  /* ---------- TOOLBAR ---------- */
+  .toolbar {
+    display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
+    margin-bottom: 18px;
+  }
+  .search {
+    flex: 1; min-width: 220px;
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 16px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+    backdrop-filter: blur(16px);
+  }
+  .search input {
+    flex: 1; background: transparent; border: none; outline: none;
+    color: var(--text); font-size: 14px; font-family: inherit;
+  }
+  .search input::placeholder { color: var(--text-faint); }
+  .search svg { opacity: 0.7; }
+
+  .filter-select, .btn {
+    padding: 12px 16px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+    color: var(--text); font-size: 14px; font-weight: 600;
+    cursor: pointer;
+    backdrop-filter: blur(16px);
+    transition: all 0.25s ease;
+    font-family: inherit;
+  }
+  .filter-select { appearance: none; padding-right: 36px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='3'><polyline points='6 9 12 15 18 9'/></svg>");
+    background-repeat: no-repeat; background-position: right 12px center;
+  }
+  .filter-select option { background: #1a1a2e; color: var(--text); }
+
+  .btn:hover { background: var(--glass-bg-strong); border-color: var(--glass-border-strong); transform: translateY(-1px); }
+  .btn-primary {
+    background: linear-gradient(135deg, #7c9cff, #b388ff);
+    border: none; box-shadow: 0 8px 22px rgba(124,156,255,0.4);
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(124,156,255,0.55); }
+  .btn-danger { color: #ffd1d1; }
+  .btn-danger:hover { background: rgba(248,113,113,0.18); border-color: rgba(248,113,113,0.4); }
+
+  /* ---------- TABS ---------- */
+  .tabs {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    padding: 8px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    backdrop-filter: blur(18px);
+    margin-bottom: 22px;
+  }
+  .tab {
+    flex: 1; min-width: 140px;
+    border: none; background: transparent;
+    color: var(--text-dim);
+    padding: 12px 14px; border-radius: 12px; cursor: pointer;
+    font-weight: 600; font-size: 13.5px;
+    transition: all 0.3s ease;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    font-family: inherit;
+  }
+  .tab .count {
+    display: inline-grid; place-items: center;
+    min-width: 22px; height: 22px; padding: 0 7px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.16);
+    font-size: 11px; font-weight: 700;
+  }
+  .tab:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+  .tab.active {
+    background: linear-gradient(135deg, rgba(255,255,255,0.22), rgba(255,255,255,0.08));
+    color: var(--text);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.25);
+  }
+  .tab.active .count { background: linear-gradient(135deg,#7c9cff,#b388ff); }
+
+  /* ---------- TASK PANEL ---------- */
+  .panel {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    backdrop-filter: blur(22px) saturate(160%);
+    -webkit-backdrop-filter: blur(22px) saturate(160%);
+    box-shadow: var(--shadow-lg), var(--shadow-inset);
+    padding: 22px;
+    animation: fadeIn 0.4s ease;
+  }
+  @keyframes fadeIn { from {opacity: 0; transform: translateY(8px);} to {opacity: 1; transform: translateY(0);} }
+
+  .panel-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 18px; flex-wrap: wrap; gap: 12px;
+  }
+  .panel-title { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+  .panel-title .dot { width: 10px; height: 10px; border-radius: 50%; background: linear-gradient(135deg,#7c9cff,#b388ff); box-shadow: 0 0 12px #7c9cff; }
+  .panel-meta { font-size: 13px; color: var(--text-dim); }
+
+  /* ---------- TASK LIST ---------- */
+  .task-list { display: flex; flex-direction: column; gap: 10px; }
+  .task {
+    display: flex; align-items: flex-start; gap: 14px;
+    padding: 14px 16px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: var(--radius-sm);
+    backdrop-filter: blur(10px);
+    transition: all 0.25s ease;
+    animation: slideIn 0.3s ease;
+  }
+  @keyframes slideIn { from {opacity:0; transform: translateY(6px);} to {opacity:1; transform: translateY(0);} }
+  .task:hover { background: rgba(255,255,255,0.09); border-color: rgba(255,255,255,0.22); transform: translateY(-1px); }
+  .task.overdue { border-color: rgba(248,113,113,0.5); background: rgba(248,113,113,0.08); }
+  .task.completed { opacity: 0.75; }
+  .task.completed .task-title, .task.completed .task-notes { text-decoration: line-through; color: var(--text-faint); }
+
+  .checkbox {
+    appearance: none; -webkit-appearance: none;
+    width: 22px; height: 22px; flex-shrink: 0;
+    border: 2px solid rgba(255,255,255,0.4);
+    border-radius: 7px;
+    cursor: pointer;
+    margin-top: 2px;
+    position: relative;
+    transition: all 0.2s ease;
+    background: rgba(255,255,255,0.05);
+  }
+  .checkbox:hover { border-color: var(--accent); }
+  .checkbox:checked {
+    background: linear-gradient(135deg,#4ade80,#16d3c8);
+    border-color: transparent;
+    box-shadow: 0 0 12px rgba(74,222,128,0.5);
+  }
+  .checkbox:checked::after {
+    content: "✓"; position: absolute; inset: 0;
+    display: grid; place-items: center;
+    color: #062a14; font-weight: 900; font-size: 14px;
+  }
+
+  .task-body { flex: 1; min-width: 0; }
+  .task-title { font-weight: 600; font-size: 15px; margin-bottom: 4px; word-wrap: break-word; }
+  .task-notes { font-size: 13px; color: var(--text-dim); margin-bottom: 6px; word-wrap: break-word; }
+  .task-meta { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--text-faint); }
+  .task-meta span { display: inline-flex; align-items: center; gap: 4px; }
+  .task-meta .badge {
+    padding: 2px 8px; border-radius: 999px;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.15);
+  }
+  .task-meta .badge.overdue { background: rgba(248,113,113,0.2); color: #fecaca; border-color: rgba(248,113,113,0.4); }
+  .task-meta .badge.subject { background: linear-gradient(135deg, rgba(124,156,255,0.25), rgba(179,136,255,0.25)); color: #e0e7ff; }
+
+  .task-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .icon-btn {
+    width: 34px; height: 34px; border-radius: 10px;
+    border: 1px solid var(--glass-border); background: var(--glass-bg);
+    color: var(--text-dim); cursor: pointer;
+    display: grid; place-items: center;
+    transition: all 0.2s ease;
+  }
+  .icon-btn:hover { color: var(--text); background: var(--glass-bg-strong); transform: translateY(-1px); }
+  .icon-btn.danger:hover { color: #fecaca; background: rgba(248,113,113,0.2); border-color: rgba(248,113,113,0.4); }
+
+  /* ---------- EMPTY STATE ---------- */
+  .empty {
+    text-align: center; padding: 50px 20px;
+    color: var(--text-dim);
+  }
+  .empty .emo { font-size: 48px; margin-bottom: 12px; opacity: 0.85; }
+  .empty h3 { font-size: 17px; margin-bottom: 6px; color: var(--text); }
+  .empty p { font-size: 13.5px; }
+
+  /* ---------- MODAL ---------- */
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(5,8,20,0.55);
+    backdrop-filter: blur(8px);
+    display: none; align-items: center; justify-content: center;
+    padding: 20px;
+    animation: fadeIn 0.25s ease;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal {
+    width: 100%; max-width: 480px;
+    background: linear-gradient(135deg, rgba(255,255,255,0.13), rgba(255,255,255,0.06));
+    border: 1px solid var(--glass-border-strong);
+    border-radius: 22px;
+    padding: 26px;
+    backdrop-filter: blur(28px) saturate(180%);
+    box-shadow: var(--shadow-lg), var(--shadow-inset);
+    animation: scaleIn 0.25s ease;
+  }
+  @keyframes scaleIn { from {opacity:0; transform: scale(0.94);} to {opacity:1; transform: scale(1);} }
+  .modal h2 { font-size: 19px; margin-bottom: 18px; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 13px; color: var(--text-dim); margin-bottom: 6px; font-weight: 500; }
+  .field input, .field textarea, .field select {
+    width: 100%; padding: 12px 14px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    color: var(--text); font-size: 14px; font-family: inherit;
+    outline: none;
+    transition: all 0.2s ease;
+  }
+  .field input:focus, .field textarea:focus, .field select:focus {
+    border-color: var(--accent);
+    background: rgba(255,255,255,0.1);
+    box-shadow: 0 0 0 3px rgba(124,156,255,0.2);
+  }
+  .field textarea { resize: vertical; min-height: 70px; }
+  .field input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1) opacity(0.7); cursor: pointer; }
+  .field select option { background: #1a1a2e; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+
+  /* Confirm modal */
+  .confirm-text { color: var(--text-dim); font-size: 14px; margin-bottom: 18px; line-height: 1.5; }
+
+  /* ---------- TOAST ---------- */
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+    padding: 12px 18px;
+    background: rgba(20,25,45,0.85);
+    border: 1px solid var(--glass-border-strong);
+    border-radius: 12px;
+    backdrop-filter: blur(16px);
+    color: var(--text); font-size: 14px; font-weight: 500;
+    box-shadow: var(--shadow-lg);
+    opacity: 0; pointer-events: none;
+    transition: all 0.3s ease;
+    z-index: 200;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ---------- RESPONSIVE ---------- */
+  @media (max-width: 640px) {
+    .app { padding: 18px 14px 60px; }
+    .tab { min-width: auto; flex: 1 1 calc(50% - 4px); font-size: 12.5px; padding: 10px; }
+    .panel { padding: 16px; }
+    .task { padding: 12px; gap: 10px; }
+    .icon-btn { width: 32px; height: 32px; }
+    .header { padding: 14px; }
+    .brand h1 { font-size: 17px; }
+    .section-switch button { padding: 8px 14px; font-size: 13px; }
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
+</style>
+</head>
+<body data-section="task">
+
+<div class="orbs" aria-hidden="true">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+  <div class="orb o4"></div>
+</div>
+
+<main class="app">
+  <!-- HEADER -->
+  <header class="header">
+    <div class="brand">
+      <div class="brand-mark">🖤</div>
+      <div>
+        <h1>Task Manager</h1>
+        <p> • <b>MADE BY </b><i>L0n31y</i></p>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="date-pill" id="todayPill">Today</div>
+      <div class="section-switch" role="tablist" aria-label="Main sections">
+        <button id="navTask" class="active" data-section="task">📋 Tasks</button>
+        <button id="navSchool" data-section="school">🎓 School</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- TOOLBAR -->
+  <div class="toolbar">
+    <div class="search">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input id="searchInput" type="text" placeholder="Search tasks..." />
+    </div>
+    <select id="filterSelect" class="filter-select" aria-label="Filter">
+      <option value="all">All tasks</option>
+      <option value="active">Active only</option>
+      <option value="completed">Completed only</option>
+      <option value="overdue">Overdue only</option>
+    </select>
+    <button class="btn btn-primary" id="addBtn">＋ Add Task</button>
+    <button class="btn btn-danger" id="clearCompletedBtn">Clear Completed</button>
+  </div>
+
+  <!-- TABS (dynamic) -->
+  <nav class="tabs" id="tabs" role="tablist"></nav>
+
+  <!-- PANEL -->
+  <section class="panel">
+    <div class="panel-header">
+      <div class="panel-title"><span class="dot"></span><span id="panelTitle">Today Tasks</span></div>
+      <div class="panel-meta" id="panelMeta">0 tasks</div>
+    </div>
+    <div id="taskList" class="task-list"></div>
+  </section>
+</main>
+
+<!-- Add/Edit Modal -->
+<div class="modal-overlay" id="taskModal" role="dialog" aria-modal="true">
+  <div class="modal">
+    <h2 id="modalTitle">Add Task</h2>
+    <div class="field">
+      <label for="fTitle">Title *</label>
+      <input id="fTitle" type="text" placeholder="What do you want to accomplish?" />
+    </div>
+    <div class="field">
+      <label for="fNotes">Notes (optional)</label>
+      <textarea id="fNotes" placeholder="Add details, links, or reminders..."></textarea>
+    </div>
+    <div class="field" id="subjectField" style="display:none;">
+      <label for="fSubject">Subject</label>
+      <select id="fSubject">
+        <option value="Chemistry">Chemistry</option>
+        <option value="English">English</option>
+        <option value="Physical">Physical</option>
+        <option value="Mathematics">Mathematics</option>
+        <option value="Physics">Physics</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="fDue">Due date *</label>
+      <input id="fDue" type="date" />
+    </div>
+    <div class="modal-actions">
+      <button class="btn" id="cancelModalBtn">Cancel</button>
+      <button class="btn btn-primary" id="saveModalBtn">Save Task</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Modal -->
+<div class="modal-overlay" id="confirmModal" role="dialog" aria-modal="true">
+  <div class="modal" style="max-width: 400px;">
+    <h2 id="confirmTitle">Are you sure?</h2>
+    <p class="confirm-text" id="confirmText">This action cannot be undone.</p>
+    <div class="modal-actions">
+      <button class="btn" id="cancelConfirmBtn">Cancel</button>
+      <button class="btn btn-danger" id="okConfirmBtn">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =======================================================
+   TASK MANAGER - LIQUID GLASS
+   ======================================================= */
+
+const STORAGE_KEY = 'lg_task_manager_v1';
+
+const SUBJECTS = ['Chemistry','English','Physical','Mathematics','Physics'];
+
+const TASK_TABS = [
+  { id: 'today',     label: 'Today',          icon: '📅' },
+  { id: 'week',      label: 'This Week',      icon: '🗓️' },
+  { id: 'monthYear', label: 'Month / Year',   icon: '📆' },
+  { id: 'completed', label: 'Completed',      icon: '✅' },
+];
+
+const SCHOOL_TABS = [
+  { id: 'Chemistry',   label: 'Chemistry',   icon: '🧪' },
+  { id: 'English',     label: 'English',     icon: '📖' },
+  { id: 'Physical',    label: 'Physical',    icon: '🏃' },
+  { id: 'Mathematics', label: 'Mathematics', icon: '➗' },
+  { id: 'Physics',     label: 'Physics',     icon: '⚛️' },
+  { id: 'completed',   label: 'Completed',   icon: '✅' },
+];
+
+// State
+let state = loadState();
+let currentSection = 'task';   // 'task' | 'school'
+let currentTab = 'today';      // depends on section
+let editingId = null;          // null = add mode
+let pendingConfirm = null;     // function to run on confirm
+
+/* ---------- STORAGE ---------- */
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return { tasks: [] };
+}
+function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+
+/* ---------- DATE HELPERS ---------- */
+function todayStr() {
+  const d = new Date(); d.setHours(0,0,0,0);
+  return d.toISOString().slice(0,10);
+}
+function parseDate(s) { const d = new Date(s + 'T00:00:00'); d.setHours(0,0,0,0); return d; }
+function startOfDay(d) { const x = new Date(d); x.setHours(0,0,0,0); return x; }
+function fmtDate(s) {
+  if (!s) return '—';
+  const d = parseDate(s);
+  return d.toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' });
+}
+function fmtDateTime(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString(undefined, { month:'short', day:'numeric', year:'numeric' });
+}
+function isOverdue(task) {
+  if (task.completed) return false;
+  return parseDate(task.due) < startOfDay(new Date());
+}
+function bucketForDate(dueStr) {
+  const today = startOfDay(new Date());
+  const due = parseDate(dueStr);
+  const diffDays = Math.round((due - today) / 86400000);
+
+  if (diffDays <= 0) return 'today';     // today or overdue → Today bucket
+  if (diffDays <= 7) return 'week';
+  return 'monthYear';
+}
+
+/* ---------- TASK LOGIC ---------- */
+function createTask({ title, notes, due, type, subject }) {
+  return {
+    id: crypto.randomUUID ? crypto.randomUUID() : ('id-' + Date.now() + '-' + Math.random().toString(36).slice(2,8)),
+    title, notes: notes || '',
+    due,
+    type, // 'task' | 'school'
+    subject: subject || null,
+    completed: false,
+    createdAt: new Date().toISOString(),
+    completedAt: null,
+  };
+}
+
+function getVisibleTasks() {
+  const search = document.getElementById('searchInput').value.trim().toLowerCase();
+  const filter = document.getElementById('filterSelect').value;
+
+  let list = state.tasks.filter(t => t.type === currentSection);
+
+  // Bucket by current tab
+  if (currentSection === 'task') {
+    if (currentTab === 'completed') list = list.filter(t => t.completed);
+    else list = list.filter(t => !t.completed && bucketForDate(t.due) === currentTab);
+  } else {
+    if (currentTab === 'completed') list = list.filter(t => t.completed);
+    else list = list.filter(t => !t.completed && t.subject === currentTab);
+  }
+
+  // Filter
+  if (filter === 'active') list = list.filter(t => !t.completed);
+  else if (filter === 'completed') list = list.filter(t => t.completed);
+  else if (filter === 'overdue') list = list.filter(t => isOverdue(t));
+
+  // Search
+  if (search) {
+    list = list.filter(t =>
+      t.title.toLowerCase().includes(search) ||
+      (t.notes && t.notes.toLowerCase().includes(search))
+    );
+  }
+
+  // Sort: incomplete by due asc, completed by completedAt desc
+  list.sort((a,b) => {
+    if (a.completed !== b.completed) return a.completed ? 1 : -1;
+    if (a.completed && b.completed) return new Date(b.completedAt) - new Date(a.completedAt);
+    return parseDate(a.due) - parseDate(b.due);
+  });
+
+  return list;
+}
+
+/* ---------- COUNTS ---------- */
+function countsForCurrentSection() {
+  const list = state.tasks.filter(t => t.type === currentSection);
+  const counts = {};
+  if (currentSection === 'task') {
+    counts.today = list.filter(t => !t.completed && bucketForDate(t.due) === 'today').length;
+    counts.week  = list.filter(t => !t.completed && bucketForDate(t.due) === 'week').length;
+    counts.monthYear = list.filter(t => !t.completed && bucketForDate(t.due) === 'monthYear').length;
+    counts.completed = list.filter(t => t.completed).length;
+  } else {
+    SUBJECTS.forEach(s => { counts[s] = list.filter(t => !t.completed && t.subject === s).length; });
+    counts.completed = list.filter(t => t.completed).length;
+  }
+  return counts;
+}
+
+/* ---------- RENDER ---------- */
+function renderTabs() {
+  const wrap = document.getElementById('tabs');
+  const tabs = currentSection === 'task' ? TASK_TABS : SCHOOL_TABS;
+  const counts = countsForCurrentSection();
+  wrap.innerHTML = tabs.map(t => `
+    <button class="tab ${currentTab === t.id ? 'active' : ''}" data-tab="${t.id}">
+      <span>${t.icon}</span>
+      <span>${t.label}</span>
+      <span class="count">${counts[t.id] || 0}</span>
+    </button>
+  `).join('');
+  wrap.querySelectorAll('.tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentTab = btn.dataset.tab;
+      render();
+    });
+  });
+}
+
+function renderPanel() {
+  const tabs = currentSection === 'task' ? TASK_TABS : SCHOOL_TABS;
+  const tabDef = tabs.find(t => t.id === currentTab) || tabs[0];
+  const titleSuffix = currentSection === 'school' && currentTab !== 'completed' ? ' Tasks' :
+                      currentSection === 'school' && currentTab === 'completed' ? ' (School)' :
+                      ' Tasks';
+  document.getElementById('panelTitle').textContent = tabDef.label + titleSuffix;
+
+  const list = getVisibleTasks();
+  document.getElementById('panelMeta').textContent = `${list.length} task${list.length === 1 ? '' : 's'}`;
+
+  const wrap = document.getElementById('taskList');
+  if (list.length === 0) {
+    wrap.innerHTML = `
+      <div class="empty">
+        <div class="emo">${currentTab === 'completed' ? '🌟' : '📭'}</div>
+        <h3>${currentTab === 'completed' ? 'Nothing completed yet' : 'No tasks here'}</h3>
+        <p>${currentTab === 'completed' ? 'Finish a task to see it here.' : 'Click ＋ Add Task to create one.'}</p>
+      </div>`;
+    return;
+  }
+
+  wrap.innerHTML = list.map(t => {
+    const overdue = isOverdue(t);
+    const subjectBadge = t.subject ? `<span class="badge subject">${t.subject}</span>` : '';
+    const dueBadge = t.completed
+      ? `<span class="badge">Completed ${fmtDateTime(t.completedAt)}</span>`
+      : `<span class="badge ${overdue ? 'overdue' : ''}">Due ${fmtDate(t.due)}${overdue ? ' • Overdue' : ''}</span>`;
+    return `
+      <div class="task ${t.completed ? 'completed' : ''} ${overdue ? 'overdue' : ''}" data-id="${t.id}">
+        <input type="checkbox" class="checkbox" ${t.completed ? 'checked' : ''} data-action="toggle" aria-label="Mark complete"/>
+        <div class="task-body">
+          <div class="task-title">${escapeHtml(t.title)}</div>
+          ${t.notes ? `<div class="task-notes">${escapeHtml(t.notes)}</div>` : ''}
+          <div class="task-meta">
+            ${subjectBadge}
+            ${dueBadge}
+            <span>Created ${fmtDateTime(t.createdAt)}</span>
+          </div>
+        </div>
+        <div class="task-actions">
+          <button class="icon-btn" data-action="edit" title="Edit" aria-label="Edit">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button class="icon-btn danger" data-action="delete" title="Delete" aria-label="Delete">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+        </div>
+      </div>`;
+  }).join('');
+
+  wrap.querySelectorAll('.task').forEach(el => {
+    const id = el.dataset.id;
+    el.querySelector('[data-action="toggle"]').addEventListener('change', () => toggleTask(id));
+    el.querySelector('[data-action="edit"]').addEventListener('click', () => openEditModal(id));
+    el.querySelector('[data-action="delete"]').addEventListener('click', () => confirmDelete(id));
+  });
+}
+
+function render() {
+  document.body.dataset.section = currentSection;
+  // Default tab if invalid for section
+  const validIds = (currentSection === 'task' ? TASK_TABS : SCHOOL_TABS).map(t => t.id);
+  if (!validIds.includes(currentTab)) currentTab = validIds[0];
+
+  document.getElementById('navTask').classList.toggle('active', currentSection === 'task');
+  document.getElementById('navSchool').classList.toggle('active', currentSection === 'school');
+
+  renderTabs();
+  renderPanel();
+}
+
+/* ---------- ACTIONS ---------- */
+function toggleTask(id) {
+  const t = state.tasks.find(x => x.id === id);
+  if (!t) return;
+  t.completed = !t.completed;
+  t.completedAt = t.completed ? new Date().toISOString() : null;
+  saveState();
+  toast(t.completed ? 'Task completed 🎉' : 'Task reopened');
+  render();
+}
+
+function openAddModal() {
+  editingId = null;
+  document.getElementById('modalTitle').textContent = 'Add Task';
+  document.getElementById('fTitle').value = '';
+  document.getElementById('fNotes').value = '';
+  document.getElementById('fDue').value = todayStr();
+
+  const subjectField = document.getElementById('subjectField');
+  if (currentSection === 'school') {
+    subjectField.style.display = '';
+    const preset = SUBJECTS.includes(currentTab) ? currentTab : 'Chemistry';
+    document.getElementById('fSubject').value = preset;
+  } else {
+    subjectField.style.display = 'none';
+  }
+  showModal('taskModal');
+  setTimeout(() => document.getElementById('fTitle').focus(), 80);
+}
+
+function openEditModal(id) {
+  const t = state.tasks.find(x => x.id === id);
+  if (!t) return;
+  editingId = id;
+  document.getElementById('modalTitle').textContent = 'Edit Task';
+  document.getElementById('fTitle').value = t.title;
+  document.getElementById('fNotes').value = t.notes;
+  document.getElementById('fDue').value = t.due;
+
+  const subjectField = document.getElementById('subjectField');
+  if (t.type === 'school') {
+    subjectField.style.display = '';
+    document.getElementById('fSubject').value = t.subject || 'Chemistry';
+  } else {
+    subjectField.style.display = 'none';
+  }
+  showModal('taskModal');
+}
+
+function saveModal() {
+  const title = document.getElementById('fTitle').value.trim();
+  const notes = document.getElementById('fNotes').value.trim();
+  const due = document.getElementById('fDue').value;
+  const subject = currentSection === 'school' ? document.getElementById('fSubject').value : null;
+
+  if (!title) { toast('Please enter a title'); return; }
+  if (!due) { toast('Please pick a due date'); return; }
+
+  if (editingId) {
+    const t = state.tasks.find(x => x.id === editingId);
+    if (t) {
+      t.title = title; t.notes = notes; t.due = due;
+      if (t.type === 'school') t.subject = subject;
+    }
+    toast('Task updated');
+  } else {
+    const t = createTask({ title, notes, due, type: currentSection, subject });
+    state.tasks.push(t);
+    toast('Task added ✨');
+    // Auto-jump to bucket containing it
+    if (currentSection === 'task') currentTab = bucketForDate(due);
+    else currentTab = subject;
+  }
+  saveState();
+  hideModal('taskModal');
+  render();
+}
+
+function confirmDelete(id) {
+  const t = state.tasks.find(x => x.id === id);
+  if (!t) return;
+  document.getElementById('confirmTitle').textContent = 'Delete this task?';
+  document.getElementById('confirmText').textContent = `"${t.title}" will be permanently removed.`;
+  document.getElementById('okConfirmBtn').textContent = 'Delete';
+  pendingConfirm = () => {
+    state.tasks = state.tasks.filter(x => x.id !== id);
+    saveState(); render(); toast('Task deleted');
+  };
+  showModal('confirmModal');
+}
+
+function clearCompleted() {
+  const completedHere = state.tasks.filter(t => t.type === currentSection && t.completed);
+  if (completedHere.length === 0) { toast('Nothing to clear'); return; }
+  document.getElementById('confirmTitle').textContent = 'Clear completed tasks?';
+  document.getElementById('confirmText').textContent = `${completedHere.length} completed task(s) in ${currentSection === 'task' ? 'Tasks' : 'School'} will be removed.`;
+  document.getElementById('okConfirmBtn').textContent = 'Clear';
+  pendingConfirm = () => {
+    state.tasks = state.tasks.filter(t => !(t.type === currentSection && t.completed));
+    saveState(); render(); toast('Completed tasks cleared');
+  };
+  showModal('confirmModal');
+}
+
+/* ---------- MODAL HELPERS ---------- */
+function showModal(id) { document.getElementById(id).classList.add('show'); }
+function hideModal(id) { document.getElementById(id).classList.remove('show'); }
+
+/* ---------- TOAST ---------- */
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+/* ---------- UTIL ---------- */
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+/* ---------- INIT ---------- */
+function init() {
+  // Today pill
+  const today = new Date();
+  document.getElementById('todayPill').innerHTML =
+    `Today • <strong>${today.toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric' })}</strong>`;
+
+  // Section nav
+  document.getElementById('navTask').addEventListener('click', () => { currentSection = 'task'; currentTab = 'today'; render(); });
+  document.getElementById('navSchool').addEventListener('click', () => { currentSection = 'school'; currentTab = 'Chemistry'; render(); });
+
+  // Toolbar
+  document.getElementById('addBtn').addEventListener('click', openAddModal);
+  document.getElementById('clearCompletedBtn').addEventListener('click', clearCompleted);
+  document.getElementById('searchInput').addEventListener('input', renderPanel);
+  document.getElementById('filterSelect').addEventListener('change', renderPanel);
+
+  // Modal buttons
+  document.getElementById('cancelModalBtn').addEventListener('click', () => hideModal('taskModal'));
+  document.getElementById('saveModalBtn').addEventListener('click', saveModal);
+  document.getElementById('cancelConfirmBtn').addEventListener('click', () => { pendingConfirm = null; hideModal('confirmModal'); });
+  document.getElementById('okConfirmBtn').addEventListener('click', () => {
+    if (pendingConfirm) pendingConfirm();
+    pendingConfirm = null;
+    hideModal('confirmModal');
+  });
+
+  // Click outside modal to close
+  document.querySelectorAll('.modal-overlay').forEach(ov => {
+    ov.addEventListener('click', e => { if (e.target === ov) ov.classList.remove('show'); });
+  });
+
+  // Esc to close, Enter to save in add modal
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.show').forEach(m => m.classList.remove('show'));
+    if (e.key === 'Enter' && document.getElementById('taskModal').classList.contains('show')) {
+      if (document.activeElement && document.activeElement.tagName !== 'TEXTAREA') saveModal();
+    }
+  });
+
+  render();
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
